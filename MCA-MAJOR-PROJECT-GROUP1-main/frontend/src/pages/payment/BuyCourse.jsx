@@ -90,7 +90,7 @@ function BuyCourse() {
         const options = {
 
           key:
-            "rzp_test_Siosd3aPa271Y0",
+            "rzp_test_SphHWiSt6u3B0p",
 
           amount:
             data.order.amount,

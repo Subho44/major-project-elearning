@@ -34,6 +34,9 @@ function Register() {
   const [password, setPassword] =
     useState("");
 
+  const [role, setRole] =
+    useState("student");
+
   const [loading, setLoading] =
     useState(false);
 
@@ -58,6 +61,7 @@ function Register() {
             name,
             email,
             password,
+            role,
           }
         );
 
@@ -75,7 +79,7 @@ function Register() {
       alert(
         error.response?.data
           ?.message ||
-          "Error"
+        "Error"
       );
     }
 
@@ -175,6 +179,8 @@ function Register() {
               }
 
               style={styles.input}
+
+              required
             />
 
           </div>
@@ -202,6 +208,8 @@ function Register() {
               }
 
               style={styles.input}
+
+              required
             />
 
           </div>
@@ -229,7 +237,46 @@ function Register() {
               }
 
               style={styles.input}
+
+              required
             />
+
+          </div>
+
+          {/* ROLE */}
+          <div style={styles.inputBox}>
+
+            <FaUser
+              style={styles.icon}
+            />
+
+            <select
+              value={role}
+
+              onChange={(e) =>
+                setRole(
+                  e.target.value
+                )
+              }
+
+              style={styles.select}
+
+              required
+            >
+
+              <option value="student">
+                Student
+              </option>
+
+              <option value="instructor">
+                Instructor
+              </option>
+
+              <option value="admin">
+                Admin
+              </option>
+
+            </select>
 
           </div>
 
@@ -447,6 +494,29 @@ const styles = {
   },
 
   input: {
+    flex: 1,
+
+    background:
+      "rgba(0,0,0,0.45)",
+
+    border:
+      "1px solid rgba(255,140,0,0.25)",
+
+    outline: "none",
+
+    color: "white",
+
+    fontSize: "15px",
+
+    padding: "14px",
+
+    borderRadius: "12px",
+
+    boxShadow:
+      "0 0 12px rgba(255,140,0,0.08)",
+  },
+
+  select: {
     flex: 1,
 
     background:

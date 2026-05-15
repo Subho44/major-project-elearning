@@ -16,6 +16,7 @@ export const register = async (
       name,
       email,
       password,
+      role,
     } = req.body;
 
     const existingUser =
@@ -44,8 +45,14 @@ export const register = async (
             900000
       ).toString();
 
+    // TEMP SAVE
     tempUsers[email] = {
+
       name,
+
+      email,
+
+      role,
 
       password:
         hashedPassword,
@@ -113,11 +120,17 @@ export const verifyOTP = async (
       });
     }
 
+    // CREATE USER
     const user =
       await User.create({
-        name: data.name,
+
+        name:
+          data.name,
 
         email,
+
+        role:
+          data.role,
 
         password:
           data.password,
@@ -128,6 +141,7 @@ export const verifyOTP = async (
     delete tempUsers[email];
 
     res.json({
+
       message:
         "User registered successfully",
 
@@ -186,6 +200,7 @@ export const login = async (
     }
 
     res.json({
+
       message:
         "Login successful",
 

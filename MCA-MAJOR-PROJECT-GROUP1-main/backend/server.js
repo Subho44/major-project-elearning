@@ -21,7 +21,7 @@ import chatRoutes from "./routes/chatRoutes.js";
 import errorHandler from "./middleware/errorMiddleware.js";
 import testRoutes from "./routes/testRoutes.js";
 import progressRoutes from "./routes/progressRoutes.js";
-
+import speechRoutes from "./routes/speech.js";
 import { initSocket }
 from "./socket/socket.js";
 
@@ -110,6 +110,7 @@ app.use(
   "/api/progress",
   progressRoutes
 );
+app.use("/api/speech", speechRoutes);
 
 // TEST ROUTE
 app.get("/", (req, res) => {

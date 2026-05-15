@@ -1,3 +1,7 @@
+// ==========================================
+// ChatPage.jsx FULL FINAL SPEECH FIX
+// ==========================================
+
 import React, {
   useEffect,
   useState,
@@ -18,6 +22,7 @@ import {
   FaPaperPlane,
   FaRobot,
   FaUserAstronaut,
+  FaMicrophone,
 } from "react-icons/fa";
 
 function ChatPage() {
@@ -34,17 +39,23 @@ function ChatPage() {
   const [message, setMessage] =
     useState("");
 
-  const messagesEndRef =
-    useRef(null);
+  const [isListening, setIsListening] =
+    useState(false);
 
   const chatBoxRef =
     useRef(null);
+
+  const mediaRecorderRef =
+    useRef(null);
+
+  const audioChunksRef =
+    useRef([]);
 
   const user = JSON.parse(
     localStorage.getItem("user")
   );
 
-  // AUTO SCROLL INSIDE CHAT ONLY
+  // AUTO SCROLL
   useEffect(() => {
 
     if (
@@ -86,11 +97,20 @@ function ChatPage() {
       socket.off(
         "receiveMessage"
       );
+
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !==
+          "inactive"
+      ) {
+
+        mediaRecorderRef.current.stop();
+      }
     };
 
   }, []);
 
-  // USERS
+  // FETCH USERS
   const fetchUsers = async () => {
 
     try {
@@ -154,8 +174,7 @@ function ChatPage() {
     if (
       !message.trim() ||
       !selectedUser
-    )
-      return;
+    ) return;
 
     try {
 
@@ -167,7 +186,6 @@ function ChatPage() {
         {
           receiverId:
             selectedUser,
-
           message,
         },
         {
@@ -182,10 +200,8 @@ function ChatPage() {
         "sendMessage",
         {
           senderId: user._id,
-
           receiverId:
             selectedUser,
-
           message,
         }
       );
@@ -194,7 +210,6 @@ function ChatPage() {
         ...prev,
         {
           sender: user._id,
-
           message,
         },
       ]);
@@ -206,6 +221,256 @@ function ChatPage() {
       console.log(error);
     }
   };
+
+  // ==========================================
+  // SPEECH TO TEXT FINAL
+  // ==========================================
+
+  // ==========================================
+// FINAL WORKING SPEECH SECTION
+// Replace ONLY startListening function
+// ==========================================
+
+const startListening = async () => {
+
+  try {
+
+    // STOP RECORDING
+    if (
+      isListening &&
+      mediaRecorderRef.current
+    ) {
+
+      mediaRecorderRef.current.stop();
+
+      setIsListening(false);
+
+      return;
+    }
+
+    // GET MICROPHONE
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+    // CHECK SUPPORTED TYPE
+    let mimeType =
+      "audio/webm";
+
+    if (
+      MediaRecorder.isTypeSupported(
+        "audio/webm;codecs=opus"
+      )
+    ) {
+
+      mimeType =
+        "audio/webm;codecs=opus";
+    }
+
+    // RECORDER
+    const mediaRecorder =
+      new MediaRecorder(
+        stream,
+        {
+          mimeType,
+        }
+      );
+
+    mediaRecorderRef.current =
+      mediaRecorder;
+
+    audioChunksRef.current =
+      [];
+
+    console.log(
+      "Recording Started..."
+    );
+
+    // START
+    mediaRecorder.start(1000);
+
+    setIsListening(true);
+
+    // AUDIO CHUNK
+    mediaRecorder.ondataavailable =
+      (event) => {
+
+        console.log(
+          "Chunk Size:",
+          event.data.size
+        );
+
+        if (
+          event.data &&
+          event.data.size > 0
+        ) {
+
+          audioChunksRef.current.push(
+            event.data
+          );
+        }
+      };
+
+    // STOP
+    mediaRecorder.onstop =
+      async () => {
+
+        try {
+
+          console.log(
+            "Recording Stopped"
+          );
+
+          // CREATE AUDIO FILE
+          const audioBlob =
+            new Blob(
+              audioChunksRef.current,
+              {
+                type:
+                  mimeType,
+              }
+            );
+
+          console.log(
+            "Audio Size:",
+            audioBlob.size
+          );
+
+          // CHECK AUDIO
+          if (
+            audioBlob.size < 1000
+          ) {
+
+            alert(
+              "Voice too short. Speak louder."
+            );
+
+            return;
+          }
+
+          // FORM DATA
+          const formData =
+            new FormData();
+
+          formData.append(
+            "audio",
+            audioBlob,
+            "voice.webm"
+          );
+
+          const token =
+            localStorage.getItem(
+              "token"
+            );
+
+          // API REQUEST
+          const { data } =
+            await axios.post(
+              `${server}/api/speech/speech-to-text`,
+              formData,
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+              }
+            );
+
+          console.log(
+            "Speech Response:",
+            data
+          );
+
+          // SUCCESS
+          if (
+            data.success &&
+            data.text
+          ) {
+
+            let finalText =
+              data.text.trim();
+
+            console.log(
+              "VOICE:",
+              finalText
+            );
+
+            // REMOVE THANK YOU
+            finalText =
+              finalText.replace(
+                /thank you\.?/gi,
+                ""
+              );
+
+            // EMPTY CHECK
+            if (
+              finalText !== ""
+            ) {
+
+              setMessage(
+                finalText
+              );
+            }
+          }
+
+          setIsListening(
+            false
+          );
+
+          // STOP MIC
+          stream
+            .getTracks()
+            .forEach(
+              (
+                track
+              ) =>
+                track.stop()
+            );
+
+        } catch (error) {
+
+          console.log(
+            "Speech Error:",
+            error
+          );
+
+          alert(
+            error.response?.data
+              ?.message ||
+              "Speech conversion failed"
+          );
+
+          setIsListening(
+            false
+          );
+        }
+      };
+
+    // RECORD 10 SEC
+    setTimeout(() => {
+
+      if (
+        mediaRecorder.state !==
+        "inactive"
+      ) {
+
+        mediaRecorder.stop();
+      }
+
+    }, 10000);
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert(
+      "Microphone permission denied"
+    );
+
+    setIsListening(false);
+  }
+};
 
   return (
     <div style={styles.page}>
@@ -233,12 +498,10 @@ function ChatPage() {
           {users.map((u) => (
 
             <motion.div
+              key={u._id}
               whileHover={{
                 scale: 1.03,
               }}
-
-              key={u._id}
-
               style={{
                 ...styles.userCard,
 
@@ -248,9 +511,10 @@ function ChatPage() {
                     ? "linear-gradient(135deg,#ff9800,#ff5e00)"
                     : "rgba(255,255,255,0.04)",
               }}
-
               onClick={() =>
-                loadMessages(u._id)
+                loadMessages(
+                  u._id
+                )
               }
             >
 
@@ -265,7 +529,8 @@ function ChatPage() {
                 <h4
                   style={{
                     margin: 0,
-                    color: "white",
+                    color:
+                      "white",
                   }}
                 >
                   {u.name}
@@ -274,8 +539,10 @@ function ChatPage() {
                 <p
                   style={{
                     margin: 0,
-                    color: "#aaa",
-                    fontSize: "13px",
+                    color:
+                      "#aaa",
+                    fontSize:
+                      "13px",
                   }}
                 >
                   {u.role}
@@ -291,7 +558,6 @@ function ChatPage() {
         {/* CHAT AREA */}
         <div style={styles.chatArea}>
 
-          {/* HEADER */}
           <div style={styles.chatHeader}>
 
             <h3>
@@ -302,28 +568,28 @@ function ChatPage() {
 
           </div>
 
-          {/* CHAT BOX */}
+          {/* MESSAGE BOX */}
           <div
             ref={chatBoxRef}
             style={styles.chatBox}
           >
 
             {messages.map(
-              (msg, index) => (
+              (
+                msg,
+                index
+              ) => (
 
                 <motion.div
+                  key={index}
                   initial={{
                     opacity: 0,
                     y: 15,
                   }}
-
                   animate={{
                     opacity: 1,
                     y: 0,
                   }}
-
-                  key={index}
-
                   style={
                     msg.sender ===
                     user._id
@@ -338,13 +604,6 @@ function ChatPage() {
               )
             )}
 
-            <div
-              ref={messagesEndRef}
-              style={{
-                height: "1px",
-              }}
-            ></div>
-
           </div>
 
           {/* INPUT */}
@@ -352,53 +611,72 @@ function ChatPage() {
 
             <input
               type="text"
-
-              placeholder="Type futuristic message..."
-
+              placeholder="Speak or type message..."
               value={message}
-
-              className="futuristic-input"
-
               onChange={(e) =>
                 setMessage(
                   e.target.value
                 )
               }
-
-              onKeyDown={(e) => {
-
-                if (
-                  e.key === "Enter"
-                ) {
-
-                  e.preventDefault();
-
-                  sendMessage();
-                }
-              }}
-
-              style={styles.input}
+              style={
+                styles.input
+              }
             />
 
+            {/* MIC BUTTON */}
             <motion.button
-              type="button"
-
               whileHover={{
                 scale: 1.08,
               }}
-
               whileTap={{
                 scale: 0.95,
               }}
-
-              onClick={(e) => {
-
-                e.preventDefault();
-
-                sendMessage();
+              animate={{
+                scale:
+                  isListening
+                    ? [1, 1.1, 1]
+                    : 1,
               }}
+              transition={{
+                repeat:
+                  isListening
+                    ? Infinity
+                    : 0,
+                duration: 1,
+              }}
+              onClick={
+                startListening
+              }
+              style={{
+                ...styles.sendBtn,
 
-              style={styles.sendBtn}
+                background:
+                  isListening
+                    ? "red"
+                    : "linear-gradient(135deg,#ff9800,#ff5e00)",
+              }}
+            >
+
+              {isListening
+                ? "🎙️"
+                : <FaMicrophone />}
+
+            </motion.button>
+
+            {/* SEND BUTTON */}
+            <motion.button
+              whileHover={{
+                scale: 1.08,
+              }}
+              whileTap={{
+                scale: 0.95,
+              }}
+              onClick={
+                sendMessage
+              }
+              style={
+                styles.sendBtn
+              }
             >
 
               <FaPaperPlane />
@@ -415,285 +693,156 @@ function ChatPage() {
   );
 }
 
+// ==========================================
+// STYLES
+// ==========================================
+
 const styles = {
 
   page: {
-    height: "90vh",
-
+    height: "100vh",
     background:
       "linear-gradient(135deg,#0f0f0f,#111827)",
-
-    paddingTop: "120px",
-
-    paddingLeft: "30px",
-
-    paddingRight: "30px",
-
-    paddingBottom: "30px",
-
-    position: "relative",
-
-    overflowX: "hidden",
-
-    boxSizing: "border-box",
+    padding: "30px",
+    color: "white",
   },
 
   glow1: {
-    position: "absolute",
-
+    position:
+      "absolute",
     top: "-100px",
-
     left: "-100px",
-
     width: "300px",
-
     height: "300px",
-
-    borderRadius: "50%",
-
     background:
-      "rgba(255,140,0,0.15)",
-
-    filter: "blur(90px)",
+      "orange",
+    filter:
+      "blur(120px)",
+    opacity: 0.15,
   },
 
   glow2: {
-    position: "absolute",
-
+    position:
+      "absolute",
     bottom: "-100px",
-
     right: "-100px",
-
     width: "300px",
-
     height: "300px",
-
-    borderRadius: "50%",
-
     background:
-      "rgba(255,94,0,0.15)",
-
-    filter: "blur(90px)",
+      "red",
+    filter:
+      "blur(120px)",
+    opacity: 0.15,
   },
 
   container: {
     display: "flex",
-
-    height: "calc(100vh - 160px)",
-
-    borderRadius: "30px",
-
+    height: "90vh",
+    borderRadius: "20px",
     overflow: "hidden",
-
-    backdropFilter:
-      "blur(18px)",
-
     background:
-      "rgba(255,255,255,0.04)",
-
-    border:
-      "1px solid rgba(255,140,0,0.15)",
-
-    boxShadow:
-      "0 0 35px rgba(255,140,0,0.12)",
-
-    position: "relative",
-
-    zIndex: 2,
+      "rgba(255,255,255,0.03)",
+    backdropFilter:
+      "blur(20px)",
   },
 
   sidebar: {
     width: "320px",
-
-    borderRight:
-      "1px solid rgba(255,255,255,0.06)",
-
     padding: "20px",
-
-    overflowY: "auto",
-
-    background:
-      "rgba(255,255,255,0.03)",
+    borderRight:
+      "1px solid rgba(255,255,255,0.08)",
   },
 
   sideHeader: {
     display: "flex",
-
     alignItems: "center",
-
-    gap: "12px",
-
-    color: "white",
-
-    marginBottom: "25px",
-
-    fontSize: "22px",
+    gap: "10px",
+    marginBottom: "20px",
   },
 
   userCard: {
-    padding: "16px",
-
-    borderRadius: "18px",
-
-    marginBottom: "14px",
-
-    cursor: "pointer",
-
     display: "flex",
-
-    alignItems: "center",
-
-    gap: "14px",
-
-    transition: "0.3s",
-
-    border:
-      "1px solid rgba(255,140,0,0.12)",
+    gap: "12px",
+    padding: "14px",
+    borderRadius: "16px",
+    marginBottom: "12px",
+    cursor: "pointer",
   },
 
   avatar: {
     width: "50px",
-
     height: "50px",
-
-    borderRadius: "16px",
-
-    display: "flex",
-
-    alignItems: "center",
-
-    justifyContent:
-      "center",
-
+    borderRadius: "50%",
     background:
       "linear-gradient(135deg,#ff9800,#ff5e00)",
-
-    color: "white",
-
-    fontSize: "20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   chatArea: {
     flex: 1,
-
     display: "flex",
-
     flexDirection: "column",
   },
 
   chatHeader: {
-    padding: "22px",
-
+    padding: "20px",
     borderBottom:
-      "1px solid rgba(255,255,255,0.06)",
-
-    color: "white",
-
-    background:
-      "rgba(255,255,255,0.03)",
+      "1px solid rgba(255,255,255,0.08)",
   },
 
   chatBox: {
     flex: 1,
-
-    padding: "25px",
-
+    padding: "20px",
     overflowY: "auto",
-
-    scrollBehavior: "smooth",
   },
 
   myMessage: {
     background:
       "linear-gradient(135deg,#ff9800,#ff5e00)",
-
-    color: "white",
-
-    padding: "14px 18px",
-
-    borderRadius: "20px",
-
+    padding: "14px",
+    borderRadius: "16px",
     width: "fit-content",
-
     marginLeft: "auto",
-
-    marginTop: "12px",
-
-    maxWidth: "70%",
-
-    wordBreak: "break-word",
-
-    boxShadow:
-      "0 0 20px rgba(255,140,0,0.25)",
+    marginTop: "10px",
   },
 
   otherMessage: {
     background:
-      "rgba(255,255,255,0.06)",
-
-    color: "white",
-
-    padding: "14px 18px",
-
-    borderRadius: "20px",
-
+      "rgba(255,255,255,0.08)",
+    padding: "14px",
+    borderRadius: "16px",
     width: "fit-content",
-
-    marginTop: "12px",
-
-    maxWidth: "70%",
-
-    border:
-      "1px solid rgba(255,255,255,0.08)",
-
-    wordBreak: "break-word",
+    marginTop: "10px",
   },
 
   bottom: {
     display: "flex",
-
+    gap: "10px",
     padding: "20px",
-
-    gap: "12px",
-
-    borderTop:
-      "1px solid rgba(255,255,255,0.06)",
-
-    background:
-      "rgba(255,255,255,0.03)",
   },
 
   input: {
     flex: 1,
-
-    border: "none",
-
-    outline: "none",
-
     background:
-      "transparent",
-
+      "rgba(255,255,255,0.08)",
+    border: "none",
+    outline: "none",
+    padding: "14px",
+    borderRadius: "14px",
     color: "white",
   },
 
   sendBtn: {
     width: "60px",
-
     border: "none",
-
-    borderRadius: "16px",
-
+    borderRadius: "14px",
+    color: "white",
+    cursor: "pointer",
+    fontSize: "18px",
     background:
       "linear-gradient(135deg,#ff9800,#ff5e00)",
-
-    color: "white",
-
-    fontSize: "18px",
-
-    cursor: "pointer",
-
-    boxShadow:
-      "0 0 25px rgba(255,140,0,0.3)",
   },
 };
 
