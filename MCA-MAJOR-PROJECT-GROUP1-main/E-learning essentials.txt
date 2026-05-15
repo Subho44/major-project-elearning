@@ -1,0 +1,23 @@
+Backend :- (RUN - npm start)
+npm install
+npm install express
+npm install mongoose
+npm install cors
+npm install dotenv
+npm install bcryptjs
+npm install jsonwebtoken
+npm install nodemailer
+npm install razorpay
+npm install multer
+npm install cloudinary
+npm install cookie-parser
+npm install morgan
+npm install colors
+npm install nodemon --save-dev
+
+Frontend:- (RUN - npm run dev)
+npm install
+npm install react-router-dom
+npm install axios
+npm install framer-motion
+npm install react-icons
